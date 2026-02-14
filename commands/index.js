@@ -7,6 +7,12 @@ import { handleWarn, handleWarnings, handleClearWarnings } from "./warnings.js";
 import { handleMute, handleUnmute } from "./mute.js";
 import { handlePurge, handleSlowmode, handleLockdown } from "./channel.js";
 import { handleInfo, handleServerInfo } from "./info.js";
+import {
+    handleSetupReactionRoles,
+    handleRemoveReactionRole,
+    handleListReactionRoles,
+    handleUpdateRoleMap
+} from "./roles.js";
 
 export async function handleCommand(message, client) {
     const args = message.content.slice(config.prefix.length).trim().split(/ +/);
