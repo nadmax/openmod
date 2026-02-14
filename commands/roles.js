@@ -6,7 +6,7 @@ import {
     getAllReactionRoleMessages,
     emojiRoleMap,
     getRoleNameForEmoji
-} from "../utils/reactionroles.js";
+} from "../utils/roles.js";
 
 export async function handleSetupReactionRoles(message, args, member) {
     if (!message.server) {
