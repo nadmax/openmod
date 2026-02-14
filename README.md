@@ -1,4 +1,4 @@
-# Stoat
+# OpenMod
 
 A modern Stoat bot built with [Node.js](https://nodejs.org) and [revolt.js](https://revolt.js.org).
 
