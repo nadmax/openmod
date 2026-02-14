@@ -21,14 +21,14 @@ export async function handleSetupReactionRoles(message, args, member) {
         `**🎨 Choose Your Color Role**\n\n` +
         `React to this message with an emoji to get the corresponding role:\n\n` +
         `🌹 **Rose**\n` +
-        `🟣 **Violet**\n` +
-        `🔵 **Bleu foncé**\n` +
-        `📘 **Bleu clair**\n` +
-        `🟢 **Vert**\n` +
-        `🟡 **Jaune**\n` +
+        `🟣 **Purple**\n` +
+        `🔵 **Dark blue**\n` +
+        `📘 **Light blue**\n` +
+        `🟢 **Green**\n` +
+        `🟡 **Yellow**\n` +
         `🟠 **Orange**\n` +
-        `🟤 **Marron**\n` +
-        `🔴 **Rouge**\n\n` +
+        `🟤 **Brown**\n` +
+        `🔴 **Red**\n\n` +
         `*Remove your reaction to remove the role.*`;
 
     try {
@@ -38,23 +38,54 @@ export async function handleSetupReactionRoles(message, args, member) {
             notifyUsers: true
         });
 
-        const emojis = ["🌹", "🟣", "🔵", "📘", "🟢", "🟡", "🟠", "🟤", "🔴"];
-        for (const emoji of emojis) {
-            try {
-                // Note: revolt.js might not support adding reactions programmatically yet
-                // You may need to add reactions manually for now
-                // await roleMessage.react(emoji);
-            } catch (e) {
-                console.log(`Could not add reaction ${emoji}:`, e);
+        const emojis: string[] = ["🌹", "🟣", "🔵", "📘", "🟢", "🟡", "🟠", "🟤", "🔴"];
+        let successCount = 0;
+        let failCount = 0;
+        const failedEmojis: string[] = [];
+        const addReactionWithRetry = async (emoji, retries = 2) => {
+            for (let attempt = 0; attempt <= retries; attempt++) {
+                try {
+                    await roleMessage.react(emoji);
+                    return true;
+                } catch (e) {
+                    if (attempt === retries) {
+                        return false;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+                }
             }
+            return false;
+        };
+
+        for (const emoji of emojis) {
+            const success = await addReactionWithRetry(emoji);
+            if (success) {
+                successCount++;
+            } else {
+                failCount++;
+                failedEmojis.push(emoji);
+            }
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
 
-        await message.reply(
-            `✅ Reaction role message created! Please manually add the reactions:\n` +
-            `🌹 🟣 🔵 📘 🟢 🟡 🟠 🟤 🔴\n\n` +
-            `Users can now react to get their color roles!`
-        );
+        let responseMsg = `✅ Reaction role message created!\n\n`;
 
+        if (successCount === emojis.length) {
+            responseMsg += `All reactions added automatically! 🎉\n\n`;
+        } else if (successCount > 0) {
+            responseMsg += `⚠️ Added ${successCount}/${emojis.length} reactions automatically.\n`;
+            if (failedEmojis.length > 0) {
+                responseMsg += `Please manually add these reactions: ${failedEmojis.join(" ")}\n\n`;
+            }
+        } else {
+            responseMsg += `⚠️ Could not add reactions automatically (API issue).\n`;
+            responseMsg += `Please manually add these reactions:\n`;
+            responseMsg += `${emojis.join(" ")}\n\n`;
+        }
+
+        responseMsg += `Users can now react to get their color roles!`;
+
+        await message.reply(responseMsg);
     } catch (error) {
         console.error("Error creating reaction role message:", error);
         await message.reply("❌ Failed to create reaction role message.");

@@ -1,9 +1,8 @@
 import { Client } from "revolt.js";
 import { config } from "./config.js";
 import { handleCommand } from "./commands/index.js";
-import { AntiSpam, AutoMod } from "./automod.js";
+import { AutoMod } from "./automod.js";
 import {
-    warnings,
     mutedUsers,
     saveWarnings,
     saveMutedUsers,
@@ -20,16 +19,15 @@ const autoMod = new AutoMod({
 });
 
 client.on("ready", async () => {
-    console.info(`✅ Logged in as ${client.user.username}!`);
-    console.info(`🤖 Bot ID: ${client.user.id}`);
-    console.info(`📝 Command prefix: ${config.prefix}`);
-    console.info(`🔧 Ready to moderate!`);
+    console.info(`Logged in as ${client.user?.username}!`);
+    console.info(`Bot ID: ${client.user?.id}`);
+    console.info(`Command prefix: ${config.prefix}`);
+    console.info(`Ready to moderate!`);
 
-    // Log enabled features
     const enabledFeatures = Object.entries(config.features)
         .filter(([_, enabled]) => enabled)
         .map(([feature]) => feature);
-    console.info(`✨ Enabled features: ${enabledFeatures.join(", ")}`);
+    console.info(`Enabled features: ${enabledFeatures.join(", ")}`);
 });
 
 client.on("messageCreate", async (message) => {
@@ -57,7 +55,7 @@ client.on("messageCreate", async (message) => {
         if (!message.server) return;
         if (!config.autoMod.enabled) return;
 
-        const muteData = mutedUsers.get(message.author.id);
+        const muteData = mutedUsers.get(message.author?.id);
         if (muteData && muteData.serverId === message.server.id) {
             if (Date.now() < muteData.until) {
                 try {
@@ -67,18 +65,18 @@ client.on("messageCreate", async (message) => {
                     if (Date.now() - lastNotified > 60000) {
                         const timeLeft = muteData.until - Date.now();
                         const minutesLeft = Math.ceil(timeLeft / 1000 / 60);
-                        const warning = await message.channel.sendMessage(
-                            `🔇 ${message.author.username}, you are muted for ${minutesLeft} more minute(s).`
+                        const warning = await message.channel?.sendMessage(
+                            `🔇 ${message.author?.username}, you are muted for ${minutesLeft} more minute(s).`
                         );
                         muteData.lastNotified = Date.now();
 
-                        setTimeout(() => warning.delete().catch(() => { }), 5000);
+                        setTimeout(() => warning?.delete().catch(() => { }), 5000);
                     }
                 } catch (e) {
                     console.error("Could not delete muted user's message:", e);
                 }
             } else {
-                mutedUsers.delete(message.author.id);
+                mutedUsers.delete(message.author?.id);
                 saveMutedUsers();
             }
             return;
@@ -90,11 +88,11 @@ client.on("messageCreate", async (message) => {
             try {
                 await message.delete();
 
-                const warning = await message.channel.sendMessage(
-                    `⚠️ ${message.author.username}, please slow down! (${result.reason})`
+                const warning = await message.channel?.sendMessage(
+                    `⚠️ ${message.author?.username}, please slow down! (${result.reason})`
                 );
 
-                setTimeout(() => warning.delete().catch(() => { }), 5000);
+                setTimeout(() => warning?.delete().catch(() => { }), 5000);
 
                 if (config.antiSpam.muteOnSpam) {
                     const duration = config.antiSpam.muteDuration;
@@ -111,19 +109,19 @@ client.on("messageCreate", async (message) => {
                         }
 
                         const until = Date.now() + milliseconds;
-                        mutedUsers.set(message.author.id, {
+                        mutedUsers.set(message.author?.id, {
                             until,
                             serverId: message.server.id
                         });
                         saveMutedUsers();
 
                         setTimeout(() => {
-                            mutedUsers.delete(message.author.id);
+                            mutedUsers.delete(message.author?.id);
                             saveMutedUsers();
                         }, milliseconds);
 
-                        await message.channel.sendMessage(
-                            `🔇 ${message.author.username} has been automatically muted for ${duration} due to spam.`
+                        await message.channel?.sendMessage(
+                            `🔇 ${message.author?.username} has been automatically muted for ${duration} due to spam.`
                         );
                     }
                 }
@@ -134,11 +132,11 @@ client.on("messageCreate", async (message) => {
             try {
                 await message.delete();
 
-                const warning = await message.channel.sendMessage(
-                    `⚠️ ${message.author.username}, your message was removed (inappropriate content).`
+                const warning = await message.channel?.sendMessage(
+                    `⚠️ ${message.author?.username}, your message was removed (inappropriate content).`
                 );
 
-                setTimeout(() => warning.delete().catch(() => { }), 5000);
+                setTimeout(() => warning?.delete().catch(() => { }), 5000);
             } catch (e) {
                 console.error("Error handling bad word:", e);
             }
@@ -152,16 +150,18 @@ client.on("error", (error) => {
     console.error("Client error:", error);
 });
 
-client.on("messageReact", async (message, userId, emoji) => {
+client.on("messageReactionAdd", async (message, userId, emoji) => {
     try {
+        console.log(`🔔 Reaction added: ${emoji} by user ${userId} on message ${message.id}`);
         await handleReactionAdd(message, userId, emoji);
     } catch (error) {
         console.error("Error handling reaction add:", error);
     }
 });
 
-client.on("messageUnreact", async (message, userId, emoji) => {
+client.on("messageReactionRemove", async (message, userId, emoji) => {
     try {
+        console.log(`🔕 Reaction removed: ${emoji} by user ${userId} on message ${message.id}`);
         await handleReactionRemove(message, userId, emoji);
     } catch (error) {
         console.error("Error handling reaction remove:", error);
@@ -191,7 +191,7 @@ if (!BOT_TOKEN) {
     process.exit(1);
 }
 
-console.log("🚀 Starting bot...");
+console.log("Starting bot...");
 client.loginBot(BOT_TOKEN).catch((error) => {
     console.error("❌ Failed to login:", error);
     process.exit(1);

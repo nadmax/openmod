@@ -21,7 +21,7 @@ export async function handleCommand(message, client) {
     if (config.rateLimiting.enabled) {
         const rateLimitCheck = rateLimiter.check(message.author.id, command);
         if (rateLimitCheck.limited) {
-            const msg = config.messages.rateLimited.replace("{time}", rateLimitCheck.retryAfter);
+            const msg = config.messages.rateLimited.replace("{time}", String(rateLimitCheck.retryAfter ?? 0));
             await message.reply(msg);
             return;
         }

@@ -26,7 +26,7 @@ docker compose up -d
 
 ## Commands
 
-All commands use `!` prefix by default.
+All commands use `/` prefix by default.
 
 ## License
 

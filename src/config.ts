@@ -1,5 +1,5 @@
 export const config = {
-    prefix: process.env.PREFIX || "!",
+    prefix: process.env.PREFIX || "/",
 
     antiSpam: {
         enabled: true,
@@ -99,5 +99,3 @@ export const config = {
         info: "#00aaff"
     }
 };
-
-export default config;

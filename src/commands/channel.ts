@@ -1,39 +1,37 @@
+import { Message } from "revolt.js";
+
 import { config } from "../config.js";
 import { hasPermission } from "../utils/permissions.js";
 import { logAction } from "../utils/logger.js";
 
-export async function handlePurge(message, args, member) {
-    if (!message.server) {
-        return await message.reply(config.messages.serverOnly);
-    }
-
-    if (!await hasPermission(member, "ManageMessages")) {
-        return await message.reply(config.messages.noPermission);
-    }
+export async function handlePurge(message: Message, args: string[], member: any) {
+    if (!message.server) return await message.reply(config.messages.serverOnly);
+    if (!await hasPermission(member, "ManageMessages")) return await message.reply(config.messages.noPermission);
 
     const amount = parseInt(args[0]);
-
     if (isNaN(amount) || amount < 1 || amount > config.purge.maxMessages) {
         return await message.reply(`❌ Please provide a number between 1 and ${config.purge.maxMessages}.`);
     }
 
     try {
-        const messages = await message.channel.fetchMessages({ limit: amount + 1 });
-        let deleted = 0;
-        for (const msg of messages) {
-            if (msg.id !== message.id) {
-                try {
-                    await msg.delete();
-                    deleted++;
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                } catch (e) {
-                    console.error("Could not delete message:", e);
-                }
-            }
+        const fetched = await message.channel?.fetchMessagesWithUsers({ limit: amount + 1 });
+        if (!fetched) {
+            return await message.reply("❌ Could not fetch messages.");
         }
+        const messages = fetched.messages;
+        const messagesToDelete = messages.filter(msg => msg.id !== message.id);
+        const deleteResults = await Promise.all(
+            messagesToDelete.map(msg =>
+                msg.delete().then(() => true).catch(e => {
+                    console.error("Could not delete message:", e);
+                    return false;
+                })
+            )
+        );
 
-        const successMsg = config.messages.purgeSuccess
-            .replace("{count}", deleted);
+        const deletedCount = deleteResults.filter(Boolean).length;
+
+        const successMsg = config.messages.purgeSuccess.replace("{count}", String(deletedCount));
         const response = await message.reply(successMsg);
 
         await logAction(
@@ -41,20 +39,21 @@ export async function handlePurge(message, args, member) {
             "PURGE",
             message.author,
             message.channel,
-            `Deleted ${deleted} messages`
+            `Deleted ${deletedCount} messages`
         );
 
         setTimeout(async () => {
             try {
-                await response.delete();
+                await response?.delete();
                 await message.delete();
             } catch (e) {
                 console.error("Could not delete purge messages:", e);
             }
         }, config.purge.deleteDelay);
+
     } catch (error) {
         console.error("Error purging messages:", error);
-        await message.reply("❌ Failed to purge messages. Make sure I have the necessary permissions.");
+        await message.reply("❌ Failed to purge messages — make sure the bot has permission to delete messages.");
     }
 }
 

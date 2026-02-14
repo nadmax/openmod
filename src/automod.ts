@@ -1,22 +1,43 @@
+interface AntiSpamOptions {
+    spamThreshold?: number;
+    spamTimeWindow?: number;
+    duplicateThreshold?: number;
+    muteOnSpam?: boolean;
+    muteDuration?: string;
+}
+
+interface CachedMessage {
+    timestamp: number;
+    content: string;
+}
+
 export class AntiSpam {
-    constructor(options = {}) {
+    private messageCache: Map<string, CachedMessage[]>;
+    private warningCache: Map<string, unknown>;
+    private spamThreshold: number;
+    private spamTimeWindow: number;
+    private duplicateThreshold: number;
+    private muteOnSpam: boolean;
+    private muteDuration: string;
+
+    constructor(options: AntiSpamOptions = {}) {
         this.messageCache = new Map();
-        this.spamThreshold = options.spamThreshold || 5;
-        this.spamTimeWindow = options.spamTimeWindow || 5000;
-        this.duplicateThreshold = options.duplicateThreshold || 3;
-        this.muteOnSpam = options.muteOnSpam || true;
-        this.muteDuration = options.muteDuration || "10m";
         this.warningCache = new Map();
+        this.spamThreshold = options.spamThreshold ?? 5;
+        this.spamTimeWindow = options.spamTimeWindow ?? 5000;
+        this.duplicateThreshold = options.duplicateThreshold ?? 3;
+        this.muteOnSpam = options.muteOnSpam ?? true;
+        this.muteDuration = options.muteDuration ?? "10m";
     }
 
-    checkMessage(userId, message) {
+    checkMessage(userId: string, message: { content: string }) {
         const now = Date.now();
 
         if (!this.messageCache.has(userId)) {
             this.messageCache.set(userId, []);
         }
 
-        const userMessages = this.messageCache.get(userId);
+        const userMessages = this.messageCache.get(userId)!;
 
         const recentMessages = userMessages.filter(
             msg => now - msg.timestamp < this.spamTimeWindow
@@ -30,11 +51,7 @@ export class AntiSpam {
         this.messageCache.set(userId, recentMessages);
 
         if (recentMessages.length >= this.spamThreshold) {
-            return {
-                isSpam: true,
-                reason: "message_flood",
-                count: recentMessages.length
-            };
+            return { isSpam: true, reason: "message_flood", count: recentMessages.length };
         }
 
         const duplicates = recentMessages.filter(
@@ -42,80 +59,53 @@ export class AntiSpam {
         );
 
         if (duplicates.length >= this.duplicateThreshold) {
-            return {
-                isSpam: true,
-                reason: "duplicate_messages",
-                count: duplicates.length
-            };
+            return { isSpam: true, reason: "duplicate_messages", count: duplicates.length };
         }
 
         return { isSpam: false };
     }
-
-    clearUserCache(userId) {
-        this.messageCache.delete(userId);
-        this.warningCache.delete(userId);
-    }
-
-    cleanup() {
-        const now = Date.now();
-        const timeout = this.spamTimeWindow * 2;
-
-        for (const [userId, messages] of this.messageCache.entries()) {
-            const recent = messages.filter(msg => now - msg.timestamp < timeout);
-            if (recent.length === 0) {
-                this.messageCache.delete(userId);
-            } else {
-                this.messageCache.set(userId, recent);
-            }
-        }
-    }
 }
 
 export class BadWordFilter {
-    constructor(bannedWords = []) {
+    private bannedWords: Set<string>;
+    private patterns: RegExp[];
+    private action: string;
+
+    constructor(bannedWords: string[] = []) {
         this.bannedWords = new Set(bannedWords.map(w => w.toLowerCase()));
         this.patterns = [];
         this.action = "delete";
     }
 
-    addWord(word) {
+    addWord(word: string) {
         this.bannedWords.add(word.toLowerCase());
     }
 
-    removeWord(word) {
+    removeWord(word: string) {
         this.bannedWords.delete(word.toLowerCase());
     }
 
-    addPattern(pattern) {
+    addPattern(pattern: string) {
         try {
-            this.patterns.push(new RegExp(pattern, 'i'));
-        } catch (e) {
+            this.patterns.push(new RegExp(pattern, "i"));
+        } catch {
             console.error("Invalid regex pattern:", pattern);
         }
     }
 
-    check(message) {
+    check(message: { content: string }) {
         const content = message.content.toLowerCase();
         const words = content.split(/\s+/);
 
         for (const word of words) {
             if (this.bannedWords.has(word)) {
-                return {
-                    filtered: true,
-                    reason: "banned_word",
-                    word: word
-                };
+                return { filtered: true, reason: "banned_word", word };
             }
         }
 
         for (const pattern of this.patterns) {
             if (pattern.test(content)) {
-                return {
-                    filtered: true,
-                    reason: "matched_pattern",
-                    pattern: pattern.source
-                };
+                return { filtered: true, reason: "matched_pattern", pattern: pattern.source };
             }
         }
 
@@ -123,13 +113,27 @@ export class BadWordFilter {
     }
 }
 
+interface AutoModOptions {
+    antiSpam?: AntiSpamOptions;
+    bannedWords?: string[];
+    enabled?: boolean;
+    exemptRoles?: string[];
+    logChannel?: string | null;
+}
+
 export class AutoMod {
-    constructor(options = {}) {
+    private antiSpam: AntiSpam;
+    private badWordFilter: BadWordFilter;
+    private enabled: boolean;
+    private exemptRoles: Set<string>;
+    private logChannel: string | null;
+
+    constructor(options: AutoModOptions = {}) {
         this.antiSpam = new AntiSpam(options.antiSpam);
         this.badWordFilter = new BadWordFilter(options.bannedWords);
         this.enabled = options.enabled !== false;
-        this.exemptRoles = new Set(options.exemptRoles || []);
-        this.logChannel = options.logChannel || null;
+        this.exemptRoles = new Set(options.exemptRoles ?? []);
+        this.logChannel = options.logChannel ?? null;
     }
 
     async processMessage(message, client) {
@@ -184,13 +188,29 @@ export class AutoMod {
     }
 }
 
+interface ModerationLogOptions {
+    maxLogs?: number;
+}
+
+interface ModerationEntry {
+    action: string;
+    targetId?: string;
+    moderatorId?: string;
+    reason?: string;
+    timestamp?: number;
+    id?: string;
+}
+
 export class ModerationLog {
-    constructor(options = {}) {
+    private logs: ModerationEntry[];
+    private maxLogs: number;
+
+    constructor(options: ModerationLogOptions = {}) {
         this.logs = [];
-        this.maxLogs = options.maxLogs || 1000;
+        this.maxLogs = options.maxLogs ?? 1000;
     }
 
-    add(entry) {
+    add(entry: ModerationEntry): void {
         this.logs.push({
             ...entry,
             timestamp: Date.now(),
@@ -202,7 +222,11 @@ export class ModerationLog {
         }
     }
 
-    get(userId = null, action = null, limit = 50) {
+    get(
+        userId: string | null = null,
+        action: string | null = null,
+        limit: number = 50
+    ): ModerationEntry[] {
         let filtered = this.logs;
 
         if (userId) {
@@ -218,23 +242,40 @@ export class ModerationLog {
         return filtered.slice(-limit).reverse();
     }
 
-    generateId() {
-        return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    private generateId(): string {
+        return (
+            Date.now().toString(36) +
+            Math.random().toString(36).substring(2)
+        );
     }
 
-    clear() {
+    clear(): void {
         this.logs = [];
     }
 }
 
+interface RateLimiterOptions {
+    defaultLimit?: number;
+    defaultWindow?: number;
+}
+
+interface RateLimitResult {
+    limited: boolean;
+    retryAfter?: number;
+}
+
 export class RateLimiter {
-    constructor(options = {}) {
+    private limits: Map<string, number[]>;
+    private defaultLimit: number;
+    private defaultWindow: number;
+
+    constructor(options: RateLimiterOptions = {}) {
         this.limits = new Map();
-        this.defaultLimit = options.defaultLimit || 5;
-        this.defaultWindow = options.defaultWindow || 10000; // 10 seconds
+        this.defaultLimit = options.defaultLimit ?? 5;
+        this.defaultWindow = options.defaultWindow ?? 10000;
     }
 
-    check(userId, command = "default") {
+    check(userId: string, command: string = "default"): RateLimitResult {
         const key = `${userId}:${command}`;
         const now = Date.now();
 
@@ -242,13 +283,15 @@ export class RateLimiter {
             this.limits.set(key, []);
         }
 
-        const timestamps = this.limits.get(key);
+        const timestamps = this.limits.get(key)!;
         const recent = timestamps.filter(ts => now - ts < this.defaultWindow);
 
         if (recent.length >= this.defaultLimit) {
             return {
                 limited: true,
-                retryAfter: Math.ceil((recent[0] + this.defaultWindow - now) / 1000)
+                retryAfter: Math.ceil(
+                    (recent[0] + this.defaultWindow - now) / 1000
+                )
             };
         }
 
@@ -258,7 +301,7 @@ export class RateLimiter {
         return { limited: false };
     }
 
-    clear(userId, command = null) {
+    clear(userId: string, command: string | null = null): void {
         if (command) {
             this.limits.delete(`${userId}:${command}`);
         } else {
@@ -270,12 +313,13 @@ export class RateLimiter {
         }
     }
 
-    cleanup() {
+    cleanup(): void {
         const now = Date.now();
         const timeout = this.defaultWindow * 2;
 
         for (const [key, timestamps] of this.limits.entries()) {
             const recent = timestamps.filter(ts => now - ts < timeout);
+
             if (recent.length === 0) {
                 this.limits.delete(key);
             } else {

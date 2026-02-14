@@ -1,6 +1,12 @@
 import fs from "fs";
 import path from "path";
 
+interface MuteData {
+    until: number;
+    reason?: string;
+    moderatorId?: string;
+}
+
 const DATA_DIR = "./data";
 const WARNINGS_FILE = path.join(DATA_DIR, "warnings.json");
 const MUTES_FILE = path.join(DATA_DIR, "mutes.json");
@@ -30,10 +36,13 @@ export function loadWarnings() {
     }
 }
 
-export function loadMutedUsers() {
+export function loadMutedUsers(): void {
     try {
         if (fs.existsSync(MUTES_FILE)) {
-            const data = JSON.parse(fs.readFileSync(MUTES_FILE, "utf8"));
+            const data = JSON.parse(
+                fs.readFileSync(MUTES_FILE, "utf8")
+            ) as Record<string, MuteData>;
+
             mutedUsers.clear();
 
             const now = Date.now();
@@ -45,6 +54,7 @@ export function loadMutedUsers() {
                     activeCount++;
 
                     const timeLeft = muteData.until - now;
+
                     setTimeout(() => {
                         mutedUsers.delete(userId);
                         saveMutedUsers();
@@ -55,8 +65,11 @@ export function loadMutedUsers() {
 
             console.log(`✅ Loaded ${activeCount} active mutes`);
         }
-    } catch (error) {
-        console.error("Error loading muted users:", error);
+    } catch (error: unknown) {
+        console.error(
+            "Error loading muted users:",
+            error instanceof Error ? error.message : String(error)
+        );
     }
 }
 
