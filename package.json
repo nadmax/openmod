@@ -1,0 +1,21 @@
+{
+    "name": "stoat",
+    "version": "1.0.0",
+    "description": "A modern Stoat bot",
+    "license": "MIT",
+    "author": "",
+    "type": "module",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "dependencies": {
+        "csstype": "^3.2.3",
+        "revolt-api": "^0.8.5-1",
+        "revolt.js": "^7.2.0",
+        "seroval": "^1.5.0",
+        "seroval-plugins": "^1.5.0",
+        "solid-js": "^1.9.11",
+        "ulid": "^2.4.0"
+    }
+}
