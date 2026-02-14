@@ -1,7 +1,7 @@
 export async function hasPermission(member, permission) {
     try {
         if (!member || !member.server) return false;
-        if (member.server.owner === member.user.id) return true;
+        if (member.server.owner.id === member.user.id) return true;
 
         const permissions = member.permissions;
         if (!permissions) return false;
